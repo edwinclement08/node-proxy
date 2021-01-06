@@ -2,17 +2,12 @@ const http = require("http");
 const net = require("net");
 const dns = require('dns');
 
-
 const { URL } = require("url");
 
 const proxy = http.createServer(onRequest);
 
 function onRequest(client_req, client_res) {
   const { port, hostname } = new URL(client_req.url);
-  console.log('===============')
-  console.log(port)
-  console.log(hostname)
-  console.log('===============')
 
   var options = {
     hostname: hostname,
@@ -34,7 +29,7 @@ function onRequest(client_req, client_res) {
   });
 
   req.on('error', (error) => {
-      console.log('in req');
+      console.log('In HTTP Req');
       console.error(error)
   })
 }
@@ -43,7 +38,7 @@ proxy.on("connect", (req, clientSocket, head) => {
   // Connect to an origin server
   const { port, hostname } = new URL(`http://${req.url}`);
 
-  dns.lookup(hostname, (err, address, family) => {
+  dns.lookup(hostname, (err, address) => {
       // needed as Pi Hole converts all black listed ips to localhost
     if (( !err && address !== '0.0.0.0') && hostname !== '0.0.0.0') {
         const serverSocket = net.connect(port || 80, hostname, () => {
@@ -57,14 +52,12 @@ proxy.on("connect", (req, clientSocket, head) => {
             clientSocket.pipe(serverSocket);
         });
         serverSocket.on('error', (err) => {
-            console.log('-------------------------yy')
-            console.log(port)
-            console.log(hostname)
+            console.log(`Error on CONNECT request for: ${hostname}:${port} `)
             console.error(err)
         })
     } 
     else {
-        console.log(hostname);
+        console.log(`Blocked: ${hostname}`);
         req.destroy()
         clientSocket.destroy()
     }
@@ -75,8 +68,9 @@ proxy.on('error', function (error)  {
     console.log('proxy error')
     console.error(error)
 })
+
 proxy.on('request', (req) => {
-    console.log(req.url)
+    console.log(`HTTP Request: ${req.url}`)
 })
 
 // Now that proxy is running
