@@ -73,6 +73,5 @@ proxy.on('request', (req) => {
     console.log(`HTTP Request: ${req.url}`)
 })
 
-// Now that proxy is running
 proxy.listen(3000, "127.0.0.1", () => {});
 
