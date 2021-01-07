@@ -55,6 +55,29 @@ proxy.on("connect", (req, clientSocket, head) => {
             console.log(`Error on CONNECT request for: ${hostname}:${port} `)
             console.error(err)
         })
+        // clientSocket.on('error', (err) => {
+        //   console.log(err)
+        // })
+        serverSocket.on('close', (err) => console.log('S close') )
+        serverSocket.on('connect', (err) => console.log('S connect') )
+        serverSocket.on('data', (err) => console.log('S data') )
+        serverSocket.on('drain', (err) => console.log('S drain') )
+        serverSocket.on('end', (err) => console.log('S end') )
+        serverSocket.on('error', (err) =>  {console.log('S error'); console.log(err)} )
+        serverSocket.on('lookup', (err) => console.log('S lookup') )
+        serverSocket.on('ready', (err) => console.log('S ready') )
+        serverSocket.on('timeout', (err) => console.log('S timeout') )
+
+        clientSocket.on('close', (err) => console.log('C close') )
+        clientSocket.on('connect', (err) => console.log('C connect') )
+        clientSocket.on('data', (err) => console.log('C data') )
+        clientSocket.on('drain', (err) => console.log('C drain') )
+        clientSocket.on('end', (err) => console.log('C end') )
+        clientSocket.on('error', (err) => {console.log('C error'); console.log(err)} )
+        clientSocket.on('lookup', (err) => console.log('C lookup') )
+        clientSocket.on('ready', (err) => console.log('C ready') )
+        clientSocket.on('timeout', (err) => console.log('C timeout') )
+        // clientSocket.on((e) => {console.log(e)})
     } 
     else {
         console.log(`Blocked: ${hostname}`);
