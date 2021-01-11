@@ -12,16 +12,16 @@ function applyCallbacks(localsocket, remotesocket) {
     if(error) {
       console.error(`\nFailed to Connect to remote ${remotesocket.remoteAddress} due to `, error);
     } else {
-      currentPrintPort = null;
       console.log(`\n${localsocket.remoteAddress}:${localsocket.remotePort} connected to ${remotesocket.remoteAddress}:${remotesocket.remotePort}`);
+      currentPrintPort = null;
     }
   });
 
   remotesocket.on("data", function (data) {
-    if(currentPrintPort == localsocket.remotePort) {
+    if(currentPrintPort === localsocket.remotePort) {
       process.stdout.write('<')
     } else {
-      process.stdout.write(`${localsocket.remoteAddress}:${localsocket.remotePort} <`)
+      process.stdout.write(`\n${localsocket.remoteAddress}:${localsocket.remotePort} <`)
       currentPrintPort = localsocket.remotePort;
     }
     const flushed = localsocket.write(data);
@@ -76,15 +76,6 @@ function applyCallbacks(localsocket, remotesocket) {
 }
 
 const server = net.createServer(function (localsocket) {
-  localsocket.on("connect", function (data) {
-    console.log(
-      ">>> connection #%d from %s:%d",
-      server.connections,
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
-  });
-
   localsocket.on("data", function (data) {
     headers = data.toString("utf-8");
     lines = headers.split("\n");
@@ -93,6 +84,13 @@ const server = net.createServer(function (localsocket) {
     connection = isConnectedMap[localsocket.remotePort];
     if (connection && connection.https) {
       remotesocket = connection.socket;
+      if(currentPrintPort === localsocket.remotePort) {
+        process.stdout.write('>')
+      } else {
+        process.stdout.write(`\n${localsocket.remoteAddress}:${localsocket.remotePort} >`)
+        currentPrintPort = localsocket.remotePort;
+      }
+
       flushed = remotesocket.write(data);
       if (!flushed) {
         console.log("  local not flushed; pausing remote");
@@ -109,6 +107,12 @@ const server = net.createServer(function (localsocket) {
         isConnectedMap[localsocket.remotePort] = { socket: remotesocket, https: true };
 
         applyCallbacks(localsocket, remotesocket);
+        if(currentPrintPort === localsocket.remotePort) {
+          process.stdout.write('<')
+        } else {
+          process.stdout.write(`\n${localsocket.remoteAddress}:${localsocket.remotePort} >`)
+          currentPrintPort = localsocket.remotePort;
+        }
         flushed = localsocket.write("HTTP/1.1 200 OK\r\n\n");
         if (!flushed) {
           console.log("local not flushed; pausing remote");
