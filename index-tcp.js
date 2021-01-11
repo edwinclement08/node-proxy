@@ -1,97 +1,81 @@
-var net = require("net");
+const net = require("net");
 
 process.on("uncaughtException", function (error) {
   console.error(error);
 });
 
-let host,
-  port;
+let host, port, currentPrintPort = null, isConnectedMap = { } ;
 
-// contains localsocket port -> remoteSocket mapping
-let isConnectedMap = {
-
-}
 
 function applyCallbacks(localsocket, remotesocket) {
   remotesocket.on("connect", (error) => {
-    console.log("connected to remote Err:", error);
+    if(error) {
+      console.error(`\nFailed to Connect to remote ${remotesocket.remoteAddress} due to `, error);
+    } else {
+      currentPrintPort = null;
+      console.log(`\n${localsocket.remoteAddress}:${localsocket.remotePort} connected to ${remotesocket.remoteAddress}:${remotesocket.remotePort}`);
+    }
   });
 
   remotesocket.on("data", function (data) {
-    console.log(
-      "%s:%d - writing data to local",
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
-    var flushed = localsocket.write(data);
+    if(currentPrintPort == localsocket.remotePort) {
+      process.stdout.write('<')
+    } else {
+      process.stdout.write(`${localsocket.remoteAddress}:${localsocket.remotePort} <`)
+      currentPrintPort = localsocket.remotePort;
+    }
+    const flushed = localsocket.write(data);
     if (!flushed) {
       console.log("  local not flushed; pausing remote");
       remotesocket.pause();
     }
   });
 
-  localsocket.on("drain", function () {
-    console.log(
-      "%s:%d - resuming remote",
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
+  localsocket.on("drain",  () => {
+    console.log( "\n%s:%d - resuming remote", localsocket.remoteAddress, localsocket.remotePort );
     remotesocket.resume();
   });
 
-  remotesocket.on("drain", function () {
-    console.log(
-      "%s:%d - resuming local",
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
+  remotesocket.on("drain",  () => {
+    console.log( "\n%s:%d - resuming local", localsocket.remoteAddress, localsocket.remotePort );
     localsocket.resume();
   });
 
-  localsocket.on("close", function (had_error) {
-    console.log(
-      "%s:%d - closing remote",
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
+  localsocket.on("close",  () => {
+    if(currentPrintPort === localsocket.remotePort) {
+      process.stdout.write(' ended(local)\n');
+      currentPrintPort = null;
+    } else {
+      process.stdout.write(`${localsocket.remoteAddress}:${localsocket.remotePort} ended(local)\n`);
+      currentPrintPort = null;
+    }
     remotesocket.end();
-    connected = false;
-    // remotesocket = undefined;
+    isConnectedMap[localsocket.remotePort] = undefined;
   });
 
-  remotesocket.on("close", function (had_error) {
-    console.log(
-      "%s:%d - closing local",
-      localsocket.remoteAddress,
-      localsocket.remotePort
-    );
+  remotesocket.on("close", () => {
+    if(currentPrintPort === localsocket.remotePort) {
+      process.stdout.write(' ended(remote)\n');
+      currentPrintPort = null;
+    } else {
+      process.stdout.write(`${localsocket.remoteAddress}:${localsocket.remotePort} ended(remote)\n`);
+      currentPrintPort = null;
+    }
     localsocket.end();
-    connected = false;
-    // remotesocket = undefined;
+    isConnectedMap[localsocket.remotePort] = undefined;
   });
+
   remotesocket.on("error", (err) => {
-    console.log("Error on remotesocket");
-    connected = false;
-
-    remotesocket = new net.Socket();
-    remotesocket.connect({ port, host });
-    console.log(err);
+    isConnectedMap[localsocket.remotePort] = undefined;
     localsocket.end();
   });
-  localsocket.on("error", (err) => {
-    console.log(localsocket.destroyed);
-    console.log(remotesocket.destroyed);
-    console.log("Error on localsocket");
 
-    connected = false;
-    remotesocket.end();
-    remotesocket = new net.Socket();
-    remotesocket.connect({ port, host });
-    console.log(err);
+  localsocket.on("error", (err) => {
+    isConnectedMap[localsocket.remotePort] = undefined;
   });
 }
 
-var server = net.createServer(function (localsocket) {
+const server = net.createServer(function (localsocket) {
   localsocket.on("connect", function (data) {
     console.log(
       ">>> connection #%d from %s:%d",
@@ -102,7 +86,6 @@ var server = net.createServer(function (localsocket) {
   });
 
   localsocket.on("data", function (data) {
-    console.log("-------------%------");
     headers = data.toString("utf-8");
     lines = headers.split("\n");
     const req_details = lines[0].split(" ").map((x) => x.trim(x));
@@ -118,8 +101,6 @@ var server = net.createServer(function (localsocket) {
     } else {
       if (req_details[0] === "CONNECT") {
         const host_and_port = req_details[1].split(":");
-        console.log(req_details[1]);
-        console.log(host_and_port);
         host = host_and_port[0];
         port = host_and_port[1];
 
@@ -159,23 +140,14 @@ var server = net.createServer(function (localsocket) {
         remotesocket = new net.Socket();
         remotesocket.connect({ port, host });
         flushed = remotesocket.write(data);
+        if (!flushed) { console.log("  remote not flushed; pausing local");
+          localsocket.pause();
+        }
         isConnectedMap[localsocket.remotePort] = { socket: remotesocket, https: false };
         applyCallbacks(localsocket, remotesocket)
       }
-    //    else {
-    //     remotesocket.connect({ port, host });
-    //     connected = true;
-    //     flushed = remotesocket.write(data);
-    //     if (!flushed) {
-    //       console.log("  local not flushed; pausing remote");
-    //       localsocket.pause();
-    //     }
-    //   }
     }
 
-    // if (!flushed) { console.log("  remote not flushed; pausing local");
-    //   localsocket.pause();
-    // }
   });
 });
 
