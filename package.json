@@ -4,7 +4,7 @@
   "description": "A simple proxy",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index-tcp.js"
   },
   "author": "",
   "license": "ISC"
